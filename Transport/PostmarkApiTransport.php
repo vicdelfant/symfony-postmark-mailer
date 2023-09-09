@@ -13,6 +13,7 @@ namespace Symfony\Component\Mailer\Bridge\Postmark\Transport;
 
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Bridge\Postmark\Events\PostmarkSendErrorFactory;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\HttpTransportException;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -37,9 +38,12 @@ class PostmarkApiTransport extends AbstractApiTransport
 
     private $messageStream;
 
+    private $dispatcher;
+
     public function __construct(string $key, HttpClientInterface $client = null, EventDispatcherInterface $dispatcher = null, LoggerInterface $logger = null)
     {
         $this->key = $key;
+        $this->dispatcher = $dispatcher;
 
         parent::__construct($client, $dispatcher, $logger);
     }
@@ -69,6 +73,17 @@ class PostmarkApiTransport extends AbstractApiTransport
         }
 
         if (200 !== $statusCode) {
+            $errorFactory = new PostmarkSendErrorFactory();
+
+            // Some delivery issues can be handled silently - route those through EventDispatcher
+            if (null !== $this->dispatcher && $errorFactory->supports($statusCode)) {
+                $this->dispatcher->dispatch(
+                    $errorFactory->create($result['ErrorCode'], $email)
+                );
+
+                return $response;
+            }
+
             throw new HttpTransportException('Unable to send an email: '.$result['Message'].sprintf(' (code %d).', $result['ErrorCode']), $response);
         }
 
