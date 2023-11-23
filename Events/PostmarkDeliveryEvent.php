@@ -11,22 +11,17 @@ class PostmarkDeliveryEvent
     /**
      * @var int
      */
-    public $errorCode;
+    private $errorCode;
 
     /**
      * @var Headers
      */
-    public $headers;
+    private $headers;
 
     /**
      * @var string|null
      */
-    public $message;
-
-    /**
-     * @var string|null
-     */
-    public $messageId;
+    private $message;
 
     public function __construct(string $message, int $errorCode)
     {
@@ -34,17 +29,35 @@ class PostmarkDeliveryEvent
         $this->errorCode = $errorCode;
 
         $this->headers = new Headers();
-        $this->messageId = null;
+    }
+
+    public function getErrorCode(): int
+    {
+        return $this->errorCode;
+    }
+
+    public function getHeaders(): Headers
+    {
+        return $this->headers;
+    }
+
+    public function getMessage(): ?string
+    {
+        return $this->message;
+    }
+
+    public function getMessageId(): ?string
+    {
+        if (!$this->headers->has('Message-ID')) {
+            return null;
+        }
+
+        return $this->headers->get('Message-ID')->getBodyAsString();
     }
 
     public function setHeaders(Headers $headers): self
     {
         $this->headers = $headers;
-
-        // With the Message-ID being the unique reference to an e-mail, we keep it in a separate property for convenience
-        if ($headers->has('Message-ID')) {
-            $this->messageId = $headers->get('Message-ID')->getBodyAsString();
-        }
 
         return $this;
     }
